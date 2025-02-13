@@ -1,0 +1,110 @@
+#!/bin/bash
+set -euo pipefail
+
+# Variables
+REPORT_FILE="System_Hardening_Report.txt"
+BACKUP_FILE="/project_script_backup.tar.gz"
+
+# Remove old report file if it exists
+[ -f "$REPORT_FILE" ] && rm "$REPORT_FILE"
+
+# Logging function to append data and a newline to the report
+log_report() {
+    echo -e "$1" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+}
+
+#############################
+# Section 1: System Details #
+#############################
+
+echo "Gathering hostname..."
+HOSTNAME=$(hostname)
+log_report "Hostname: $HOSTNAME"
+
+echo "Gathering OS version..."
+OS_INFO=$(cat /etc/os-release)
+log_report "OS Version:\n$OS_INFO"
+
+echo "Gathering memory information..."
+MEM_INFO=$(free -h)
+log_report "Memory Information:\n$MEM_INFO"
+
+echo "Gathering uptime information..."
+UPTIME_INFO=$(uptime -spV)
+log_report "Uptime Information: $UPTIME_INFO"
+
+###########################
+# Section 2: OS Backup    #
+###########################
+
+echo "Backing up the OS..."
+sudo tar -cvpzf "$BACKUP_FILE" \
+    --exclude="$BACKUP_FILE" \
+    --exclude=/proc \
+    --exclude=/tmp \
+    --exclude=/mnt \
+    --exclude=/sys \
+    --exclude=/dev \
+    --exclude=/run \
+    /
+log_report "OS backup completed. Backup file: $BACKUP_FILE"
+
+###############################
+# Section 3: Configuration    #
+###############################
+
+echo "Gathering sudoers file..."
+SUDOERS_CONTENT=$(cat /etc/sudoers)
+log_report "Sudoers file:\n$SUDOERS_CONTENT"
+
+echo "Gathering SSHD configuration details..."
+# Replace interactive editor with non-interactive cat command
+SSHD_CONFIG=$(sudo cat /etc/ssh/sshd_config)
+log_report "SSHD configuration file:\n$SSHD_CONFIG"
+
+###############################
+# Section 4: Permissions      #
+###############################
+
+echo "Checking for files with world permissions in /home..."
+find /home -type f -perm /o+rwx -exec chmod o-rwx {} \;
+log_report "World permissions have been removed from any files found in /home."
+
+echo "Updating permissions for Engineering scripts..."
+find / -iname '*engineering*' -exec chown :engineering {} \; -exec chmod 770 {} \;
+log_report "Permissions updated for Engineering scripts."
+
+echo "Updating permissions for Research scripts..."
+find / -iname '*research*' -exec chown :research {} \; -exec chmod 770 {} \;
+log_report "Permissions updated for Research scripts."
+
+echo "Updating permissions for Finance scripts..."
+find / -iname '*finance*' -exec chown :finance {} \; -exec chmod 770 {} \;
+log_report "Permissions updated for Finance scripts."
+
+###############################
+# Section 5: Package Updates  #
+###############################
+
+echo "Updating packages and services..."
+sudo apt update && sudo apt upgrade -y
+log_report "Packages have been updated and upgraded."
+
+echo "Listing installed packages..."
+# Save the list to a file and capture its contents
+apt list --installed > package_list.txt
+INSTALLED_PACKAGES=$(cat package_list.txt)
+log_report "Installed Packages:\n$INSTALLED_PACKAGES"
+
+###############################
+# Section 6: Logging Details  #
+###############################
+
+echo "Gathering logging configuration data..."
+JOURNALD_CONF=$(cat /etc/systemd/journald.conf)
+LOGROTATE_CONF=$(logrotate -d /etc/logrotate.conf)
+log_report "journald.conf file data:\n$JOURNALD_CONF"
+log_report "logrotate.conf file data:\n$LOGROTATE_CONF"
+
+echo "Script execution completed. Check $REPORT_FILE for details."
