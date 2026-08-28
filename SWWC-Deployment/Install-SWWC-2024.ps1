@@ -523,10 +523,12 @@ function Install-SolidWorks {
 
     $swRoot = Expand-Payload -ZipPath $SwZip
 
-    # An administrative image is required for unattended install. Look for
-    # StartSWInstall.exe at the extraction root or one folder down (zips are
-    # often built with a single top-level folder).
-    $startSw = Get-ChildItem -Path $swRoot -Filter 'StartSWInstall.exe' -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1
+    # An administrative image is required for unattended install. Confirmed
+    # layout (per pilot machine C:\SWWC\Solidworks_2024\SOLIDWORKS_2024_SP5.0):
+    # StartSWInstall.exe and sldIM.exe both live under a \sldim\ subfolder.
+    # Search unbounded (no -Depth limit) since some zips add an extra
+    # top-level wrapper folder, which would otherwise push it out of reach.
+    $startSw = Get-ChildItem -Path $swRoot -Filter 'StartSWInstall.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $startSw) {
         $hasMedia = Test-Path (Join-Path $swRoot 'setup.exe')
         if (-not $hasMedia) {
